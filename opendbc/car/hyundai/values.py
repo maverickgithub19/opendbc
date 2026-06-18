@@ -560,7 +560,11 @@ class CAR(Platforms):
                      car_parts=CarParts.common([CarHarness.hyundai_q])),
     ],
     CarSpecs(mass=2253, wheelbase=3.09, steerRatio=14.23),
-    flags=HyundaiFlags.HYBRID | HyundaiFlags.CANFD_ALT_BUTTONS,
+    # Do not force CANFD_ALT_BUTTONS for every Carnival HEV. Some trims/fingerprints
+    # use the standard CRUISE_BUTTONS message; forcing ALT makes panda wait for the
+    # wrong RX check and trips Controls Mismatch. interface.py will add ALT_BUTTONS
+    # dynamically when 0x1cf is absent on E-CAN.
+    flags=HyundaiFlags.HYBRID,
   )
 
   # Genesis
