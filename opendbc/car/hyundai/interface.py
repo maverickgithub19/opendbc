@@ -42,7 +42,7 @@ class CarInterface(CarInterfaceBase):
       CAN = CanBus(None, fingerprint, lka_steering)
 
       ret.alphaLongitudinalAvailable = not (ret.flags & HyundaiFlags.CANFD_NO_RADAR_DISABLE)
-      if lka_steering and Ecu.adas not in [fw.ecu for fw in car_fw]:
+      if lka_steering and Ecu.adas not in [fw.ecu for fw in car_fw] and not (ret.flags & HyundaiFlags.CANFD_NO_RADAR_DISABLE):
         # Some HDA2/LKA-steering variants do not expose the ADAS ECU in firmware
         # queries through this harness, even though SCC_CONTROL from the ADAS path
         # is visible on E-CAN. If SCC_CONTROL is visible, allow an alpha-long probe:

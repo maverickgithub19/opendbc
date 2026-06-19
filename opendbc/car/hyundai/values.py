@@ -585,7 +585,12 @@ class CAR(Platforms):
     # use the standard CRUISE_BUTTONS message; forcing ALT makes panda wait for the
     # wrong RX check and trips Controls Mismatch. interface.py will add ALT_BUTTONS
     # dynamically when 0x1cf is absent on E-CAN.
-    flags=HyundaiFlags.HYBRID,
+    # Route c919671999908fa5|00000001--3734ab0a60 shows the ADAS ECU at 0x730
+    # rejects communication-control disable with 0x7F 28 22 (conditions not correct).
+    # If alpha longitudinal is forced on, panda sees stock SCC/LKA traffic still
+    # present and trips Harness Relay Malfunction. Keep this platform on factory
+    # longitudinal unless/until a safe ADAS/ESCC/interceptor path is found.
+    flags=HyundaiFlags.HYBRID | HyundaiFlags.CANFD_NO_RADAR_DISABLE,
   )
 
   # Genesis
