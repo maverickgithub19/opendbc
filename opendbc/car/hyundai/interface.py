@@ -43,8 +43,12 @@ class CarInterface(CarInterfaceBase):
 
       ret.alphaLongitudinalAvailable = not (ret.flags & HyundaiFlags.CANFD_NO_RADAR_DISABLE)
       if lka_steering and Ecu.adas not in [fw.ecu for fw in car_fw]:
-        # this needs to be figured out for cars without an ADAS ECU
-        ret.alphaLongitudinalAvailable = False
+        # Some HDA2/LKA-steering variants do not expose the ADAS ECU in firmware
+        # queries through this harness, even though SCC_CONTROL from the ADAS path
+        # is visible on E-CAN. If SCC_CONTROL is visible, allow an alpha-long probe:
+        # init() will still try to silence 0x730, panda relay/TX checks will catch
+        # stock SCC conflicts, and controls will stay disengaged on a fault.
+        ret.alphaLongitudinalAvailable = 0x1a0 in fingerprint[CAN.ECAN]
 
       ret.enableBsm = 0x1ba in fingerprint[CAN.ECAN]
 
@@ -151,6 +155,8 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.EV_GAS.value
     elif ret.flags & HyundaiFlags.FCEV:
       ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.FCEV_GAS.value
+    if ret.enableBsm and ret.flags & HyundaiFlags.CANFD:
+      ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_BSM.value
 
     # Car specific configuration overrides
 
