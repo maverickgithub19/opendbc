@@ -36,15 +36,31 @@ class CanBus(CanBusBase):
     return self._cam
 
 
-def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_torque, lkas_icon):
+def create_steering_messages(packer, CP, CAN, enabled, lat_active, apply_torque, lkas_icon, hud_control=None):
+  left_lane_visible = bool(getattr(hud_control, "leftLaneVisible", False))
+  right_lane_visible = bool(getattr(hud_control, "rightLaneVisible", False))
+  left_lane_depart = bool(getattr(hud_control, "leftLaneDepart", False))
+  right_lane_depart = bool(getattr(hud_control, "rightLaneDepart", False))
+
+  if left_lane_visible and right_lane_visible:
+    lka_rcg_sta = 1  # Full lane recognized
+  elif left_lane_visible:
+    lka_rcg_sta = 2  # Left line recognized
+  elif right_lane_visible:
+    lka_rcg_sta = 3  # Right line recognized
+  else:
+    lka_rcg_sta = 0  # Not recognized
+
   values = {
     "LKA_OptUsmSta": 2,
-    "LKA_SysIndReq": lkas_icon,
+    "LKA_SysIndReq": 3 if (left_lane_depart or right_lane_depart) else lkas_icon,
     "StrTqReqVal": apply_torque,
     "LKA_SysWrn": 0,
     "ActToiSta": 1 if lat_active else 0,
     "LKA_UsmMod": 0,  # hide LKAS settings
-    "LKA_RcgSta": 0,
+    "LKA_RcgSta": lka_rcg_sta,
+    "LKA_LHLnWrnSta": 1 if left_lane_depart else 0,
+    "LKA_RHLnWrnSta": 1 if right_lane_depart else 0,
     "Damping_Gain": 100,  # can potentially tuned for better perf [3, 200]
   }
 
