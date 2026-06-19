@@ -48,6 +48,13 @@ class CarInterface(CarInterfaceBase):
       if 0xFA in fingerprint[CAN.ECAN]:
         ret.flags |= HyundaiFlags.HYBRID.value
 
+      # Cruise buttons can be carried either in standard CRUISE_BUTTONS (0x1cf)
+      # or alternate CRUISE_BUTTONS_ALT (0x1aa). This is independent of whether
+      # the platform uses LKA steering or LFA steering, so detect it before the
+      # steering-mode split and pass the same flag through to panda safety.
+      if 0x1cf not in fingerprint[CAN.ECAN]:
+        ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
+
       if lka_steering:
         # detect LKA steering
         ret.flags |= HyundaiFlags.CANFD_LKA_STEER_MSG.value
@@ -55,8 +62,6 @@ class CarInterface(CarInterfaceBase):
           ret.flags |= HyundaiFlags.CANFD_LKA_STEER_MSG_ALT.value
       else:
         # no LKA steering
-        if 0x1cf not in fingerprint[CAN.ECAN]:
-          ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
         if not ret.flags & HyundaiFlags.CANFD_RADAR_SCC:
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
 
