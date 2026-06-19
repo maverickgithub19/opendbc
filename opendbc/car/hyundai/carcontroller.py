@@ -177,8 +177,9 @@ class CarController(CarControllerBase):
     lka_steering = self.CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG
     lka_steering_long = lka_steering and self.CP.openpilotLongitudinalControl
 
-    # steering control
-    can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, apply_steer_req, apply_torque))
+    # steering control, including CAN-FD lane/HUD state for the Carnival cluster
+    can_sends.extend(hyundaicanfd.create_steering_messages(self.packer, self.CP, self.CAN, CC.enabled, apply_steer_req,
+                                                            apply_torque, hud_control))
 
     # prevent LFA from activating on LKA steering cars by sending "no lane lines detected" to ADAS ECU
     if self.frame % 5 == 0 and lka_steering:
