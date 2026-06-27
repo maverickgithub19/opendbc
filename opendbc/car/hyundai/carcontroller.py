@@ -73,6 +73,7 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
     self.car_fingerprint = CP.carFingerprint
     self.last_button_frame = 0
     self.cancel_counter = 0
+    self.daw_reset_cnt = 0
 
   def update(self, CC, CC_SP, CS, now_nanos):
     EsccCarController.update(self, CS)
@@ -243,12 +244,18 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
 
         # cruise standstill resume
         elif CC.cruiseControl.resume:
-          if self.CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS:
-            # TODO: resume for alt button cars
-            pass
-          else:
-            for _ in range(20):
-              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.RES_ACCEL))
-            self.last_button_frame = self.frame
+          for _ in range(20):
+            can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.RES_ACCEL))
+          self.last_button_frame = self.frame
+
+    if self.CP.flags & HyundaiFlags.CANFD_DISABLE_DAW:
+      # Kia/Hyundai Driver Attention Warning (coffee break / rest recommendation)
+      # comes from the camera's FR_CMR_01_10ms message.  On Carnival HEV HDA2,
+      # the cluster warning is nuisance-only for this fork, so forward a sanitized
+      # copy: keep HBA/FCA/LVDA fields intact, clear only DAW status/warning, and
+      # briefly pulse DAW_TimeRstReq so the cluster's break timer is reset.
+      can_sends.append(hyundaicanfd.create_daw_suppression(self.packer, self.CAN, CS.fr_cmr_01_msg,
+                                                           self.daw_reset_cnt < 10))
+      self.daw_reset_cnt = (self.daw_reset_cnt + 1) % 500
 
     return can_sends

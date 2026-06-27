@@ -11,23 +11,30 @@
 
 #define HYUNDAI_CANFD_LKA_STEER_MSG_COMMON_TX_MSGS(a_can, e_can) \
   HYUNDAI_CANFD_CRUISE_BUTTON_TX_MSGS(e_can)                        \
+  HYUNDAI_CANFD_DAW_SUPPRESSION_TX_MSGS(a_can)                      \
   {0x50,  a_can, 16, .check_relay = (a_can) == 0},  /* LKAS */      \
   {0x2A4, a_can, 24, .check_relay = (a_can) == 0},  /* CAM_0x2A4 */ \
 
 #define HYUNDAI_CANFD_LKA_STEER_MSG_ALT_COMMON_TX_MSGS(a_can, e_can) \
   HYUNDAI_CANFD_CRUISE_BUTTON_TX_MSGS(e_can)                        \
+  HYUNDAI_CANFD_DAW_SUPPRESSION_TX_MSGS(a_can)                      \
   {0x110, a_can, 32, .check_relay = (a_can) == 0},  /* LKAS_ALT */  \
   {0x362, a_can, 32, .check_relay = (a_can) == 0},  /* CAM_0x362 */ \
 
 #define HYUNDAI_CANFD_LKA_STEER_MSG_ALT_BUTTONS_COMMON_TX_MSGS(a_can, e_can) \
   HYUNDAI_CANFD_CRUISE_BUTTON_ALT_TX_MSGS(e_can)                            \
+  HYUNDAI_CANFD_DAW_SUPPRESSION_TX_MSGS(a_can)                              \
   {0x50,  a_can, 16, .check_relay = (a_can) == 0},  /* LKAS */              \
   {0x2A4, a_can, 24, .check_relay = (a_can) == 0},  /* CAM_0x2A4 */         \
 
 #define HYUNDAI_CANFD_LKA_STEER_MSG_ALT_ALT_BUTTONS_COMMON_TX_MSGS(a_can, e_can) \
   HYUNDAI_CANFD_CRUISE_BUTTON_ALT_TX_MSGS(e_can)                                \
+  HYUNDAI_CANFD_DAW_SUPPRESSION_TX_MSGS(a_can)                                  \
   {0x110, a_can, 32, .check_relay = (a_can) == 0},  /* LKAS_ALT */              \
   {0x362, a_can, 32, .check_relay = (a_can) == 0},  /* CAM_0x362 */             \
+
+#define HYUNDAI_CANFD_DAW_SUPPRESSION_TX_MSGS(a_can) \
+  {0x11A, a_can, 16, .check_relay = false},  /* FR_CMR_01_10ms sanitized DAW */ \
 
 #define HYUNDAI_CANFD_LFA_STEERING_COMMON_TX_MSGS(e_can)  \
   {0x12A, e_can, 16, .check_relay = (e_can) == 0},  /* LFA */            \
@@ -67,6 +74,7 @@
 static bool hyundai_canfd_alt_buttons = false;
 static bool hyundai_canfd_lka_steer_msg_alt = false;
 static bool hyundai_canfd_bsm = false;
+static bool hyundai_canfd_disable_daw = false;
 
 static unsigned int hyundai_canfd_get_lka_addr(void) {
   return hyundai_canfd_lka_steer_msg_alt ? 0x110U : 0x50U;
@@ -214,6 +222,17 @@ static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
     }
   }
 
+  // Sanitized camera Driver Attention Warning frame. This is only allowed on
+  // cars that set CANFD_DISABLE_DAW, and only to keep DAW off/no-warning.
+  if (msg->addr == 0x11AU) {
+    const bool daw_off = (((msg->data[6] >> 4) & 0x7U) == 1U);
+    const bool no_daw_warning = (((msg->data[7] >> 3) & 0x7U) == 0U);
+    const bool sys_off = (((msg->data[6] >> 7) | ((msg->data[7] & 0x7U) << 1)) == 0U);
+    if (!hyundai_canfd_disable_daw || !daw_off || !no_daw_warning || !sys_off) {
+      tx = false;
+    }
+  }
+
   // UDS: only tester present ("\x02\x3E\x80\x00\x00\x00\x00\x00") allowed on diagnostics address
   if (((msg->addr == 0x730U) && hyundai_canfd_lka_steer_msg) || ((msg->addr == 0x7D0U) && !hyundai_camera_scc)) {
     if ((GET_BYTES(msg, 0, 4) != 0x00803E02U) || (GET_BYTES(msg, 4, 4) != 0x0U)) {
@@ -258,6 +277,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   const uint16_t HYUNDAI_PARAM_CANFD_LKA_STEER_MSG_ALT = 128;
   const uint16_t HYUNDAI_PARAM_CANFD_ALT_BUTTONS = 32;
   const uint16_t HYUNDAI_PARAM_CANFD_BSM = 1024;
+  const uint16_t HYUNDAI_PARAM_CANFD_DISABLE_DAW = 2048;
 
   static const CanMsg HYUNDAI_CANFD_LKA_STEER_MSG_TX_MSGS[] = {
     HYUNDAI_CANFD_LKA_STEER_MSG_COMMON_TX_MSGS(0, 1)
@@ -331,6 +351,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   hyundai_canfd_alt_buttons = GET_FLAG(param, HYUNDAI_PARAM_CANFD_ALT_BUTTONS);
   hyundai_canfd_lka_steer_msg_alt = GET_FLAG(param, HYUNDAI_PARAM_CANFD_LKA_STEER_MSG_ALT);
   hyundai_canfd_bsm = GET_FLAG(param, HYUNDAI_PARAM_CANFD_BSM);
+  hyundai_canfd_disable_daw = GET_FLAG(param, HYUNDAI_PARAM_CANFD_DISABLE_DAW);
 
   safety_config ret;
   if (hyundai_longitudinal) {
@@ -483,10 +504,17 @@ static safety_config hyundai_canfd_init(uint16_t param) {
   return ret;
 }
 
+static bool hyundai_canfd_fwd_hook(int bus_num, int addr) {
+  // When suppressing the stock DAW coffee-break popup, block camera FR_CMR_01
+  // from bus 2 to A-CAN; carcontroller sends a sanitized copy on A-CAN.
+  return hyundai_canfd_disable_daw && (bus_num == 2) && (addr == 0x11A);
+}
+
 const safety_hooks hyundai_canfd_hooks = {
   .init = hyundai_canfd_init,
   .rx = hyundai_canfd_rx_hook,
   .tx = hyundai_canfd_tx_hook,
+  .fwd = hyundai_canfd_fwd_hook,
   .get_counter = hyundai_canfd_get_counter,
   .get_checksum = hyundai_canfd_get_checksum,
   .compute_checksum = hyundai_common_canfd_compute_checksum,
