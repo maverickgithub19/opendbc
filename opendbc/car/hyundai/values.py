@@ -68,6 +68,8 @@ class HyundaiSafetyFlags(IntFlag):
   CANFD_LKA_STEER_MSG_ALT = 128
   FCEV_GAS = 256
   ALT_LIMITS_2 = 512
+  CANFD_BSM = 1024
+  CANFD_DISABLE_DAW = 2048
 
 
 # Hyundai/Kia/Genesis SCC (Smart Cruise Control) and steering architecture:
@@ -148,6 +150,10 @@ class HyundaiFlags(IntFlag):
   FCEV = 2 ** 25
 
   ALT_LIMITS_2 = 2 ** 26
+
+  # Block camera Driver Attention Warning / coffee-break popup and forward a
+  # sanitized FR_CMR_01_10ms copy from carcontroller.
+  CANFD_DISABLE_DAW = 2 ** 27
 
 
 @dataclass
@@ -580,8 +586,10 @@ class CAR(Platforms):
                      car_parts=CarParts.common([CarHarness.hyundai_q])),
     ],
     CarSpecs(mass=2253, wheelbase=3.09, steerRatio=14.23),
-    # HYBRID and the cruise-button message are fingerprinted at runtime. This
-    # avoids a Controls Mismatch when a Carnival trim uses standard buttons.
+    # HYBRID and cruise-button layout are fingerprinted at runtime. The Carnival
+    # ADAS ECU rejects the communication-control request used for software-only
+    # longitudinal; retain factory ACC and do not force DAW suppression.
+    flags=HyundaiFlags.CANFD_NO_RADAR_DISABLE,
   )
 
   # Genesis

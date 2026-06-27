@@ -89,6 +89,19 @@ def create_suppress_lfa(packer, CAN, lfa_block_msg, lka_steering_alt):
   return packer.make_can_msg(suppress_msg, CAN.ACAN, values)
 
 
+def create_daw_suppression(packer, CAN, fr_cmr_01_msg, reset_timer):
+  values = dict(fr_cmr_01_msg)
+  # Disable/clear Driver Attention Warning while preserving the rest of the
+  # camera status frame. DAW_WrnMsgSta=1 is the "rest recommend" popup.
+  values.update({
+    "DAW_OptUsmSta": 1,       # system off
+    "DAW_SysSta": 0,          # system off
+    "DAW_WrnMsgSta": 0,       # no warning
+    "DAW_TimeRstReq": 1 if reset_timer else 0,
+  })
+  return packer.make_can_msg("FR_CMR_01_10ms", CAN.ACAN, values)
+
+
 def create_buttons(packer, CP, CAN, cnt, btn):
   canfd_msg = "CRUISE_BUTTONS_ALT" if CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS else "CRUISE_BUTTONS"
   values = {
