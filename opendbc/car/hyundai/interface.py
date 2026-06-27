@@ -151,6 +151,10 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.EV_GAS.value
     elif ret.flags & HyundaiFlags.FCEV:
       ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.FCEV_GAS.value
+    if ret.enableBsm and ret.flags & HyundaiFlags.CANFD:
+      ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_BSM.value
+    if ret.flags & HyundaiFlags.CANFD_DISABLE_DAW:
+      ret.safetyConfigs[-1].safetyParam |= HyundaiSafetyFlags.CANFD_DISABLE_DAW.value
 
     # Car specific configuration overrides
 
