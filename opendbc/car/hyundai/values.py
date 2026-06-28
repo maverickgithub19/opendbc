@@ -570,10 +570,13 @@ class CAR(Platforms):
     # use the standard CRUISE_BUTTONS message; forcing ALT makes panda wait for the
     # wrong RX check and trips Controls Mismatch. interface.py will add ALT_BUTTONS
     # dynamically when 0x1cf is absent on E-CAN.
-    # Keep the known-working AGNOS18 Carnival HEV platform flags unchanged except
-    # for DAW suppression. Do not add CANFD_NO_RADAR_DISABLE here; changing base
-    # platform flags on this branch can trip sunnypilot's vehicle variant matching.
-    flags=HyundaiFlags.HYBRID | HyundaiFlags.CANFD_DISABLE_DAW,
+    # Keep the known-working AGNOS18 Carnival HEV platform flags unchanged. Do not
+    # force CANFD_DISABLE_DAW here; some Carnival HEV HDA II variants do not send
+    # FR_CMR_01_10ms on the camera bus, and requiring it makes CAN validity fail.
+    # interface.py may enable DAW suppression dynamically only when that frame exists.
+    # Do not add CANFD_NO_RADAR_DISABLE here; changing base platform flags on this
+    # branch can trip sunnypilot's vehicle variant matching.
+    flags=HyundaiFlags.HYBRID,
   )
 
   # Genesis
