@@ -103,9 +103,9 @@ def create_daw_suppression(packer, CAN, fr_cmr_01_msg, reset_timer):
   return packer.make_can_msg("FR_CMR_01_10ms", CAN.ACAN, values)
 
 
-def create_buttons(packer, CP, CAN, cnt, btn):
+def create_buttons(packer, CP, CAN, cnt, btn, buttons_msg=None):
   canfd_msg = "CRUISE_BUTTONS_ALT" if CP.flags & HyundaiFlags.CANFD_ALT_BUTTONS else "CRUISE_BUTTONS"
-  values = {
+  values = dict(buttons_msg or {}) | {
     "COUNTER": cnt,
     "SET_ME_1": 1,
     "CRUISE_BUTTONS": btn,
