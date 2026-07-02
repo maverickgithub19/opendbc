@@ -239,13 +239,13 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
             self.last_button_frame = self.frame
           elif self.cancel_counter > CANCEL_BUTTON_DELAY_FRAMES:
             for _ in range(20):
-              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.CANCEL))
+              can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.CANCEL, CS.buttons_msg))
             self.last_button_frame = self.frame
 
         # cruise standstill resume
         elif CC.cruiseControl.resume:
           for _ in range(20):
-            can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.RES_ACCEL))
+            can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.RES_ACCEL, CS.buttons_msg))
           self.last_button_frame = self.frame
 
     if self.CP.flags & HyundaiFlags.CANFD_DISABLE_DAW:
