@@ -258,7 +258,7 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
           # Match a real held RES press. Prefer the stock button counter when it
           # is fresh, but do not depend on it while stopped: Carnival HEV CAN FD
           # logs show the factory 0x1aa counter can be stale exactly when
-          # openpilot requests standstill resume.
+          # Sunnypilot requests standstill resume.
           starting_resume = self.resume_button_start_frame < 0
           if starting_resume:
             self.resume_button_start_frame = self.frame
