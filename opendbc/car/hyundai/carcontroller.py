@@ -60,6 +60,7 @@ class CarController(CarControllerBase):
     self.apply_torque_last = 0
     self.car_fingerprint = CP.carFingerprint
     self.last_button_frame = 0
+    self.last_button_counter = -1
     self.cancel_counter = 0
     self.daw_reset_cnt = 0
 
@@ -205,8 +206,9 @@ class CarController(CarControllerBase):
                                                          set_speed_in_units, hud_control))
         self.accel_last = accel
     else:
-      # button presses
-      if (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
+      # button presses. Resume needs to be evaluated continuously so the spoofed
+      # RES press tracks the stock 50 Hz button counter; cancel remains rate-limited.
+      if CC.cruiseControl.resume or (self.frame - self.last_button_frame) * DT_CTRL > 0.25:
         # cruise cancel
         if CC.cruiseControl.cancel:
           # Here we send ACC message to cancel, not buttons. Don't delay
@@ -220,9 +222,15 @@ class CarController(CarControllerBase):
 
         # cruise standstill resume
         elif CC.cruiseControl.resume:
-          for _ in range(20):
+          # Match the real button better: one RES frame for each fresh stock button counter.
+          # Bursting many duplicate-counter frames at 4 Hz showed up on the bus but was ignored
+          # by Carnival HEV factory SCC; physical RES presses are continuous 50 Hz counter-advancing frames.
+          if CS.buttons_counter != self.last_button_counter:
             can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.RES_ACCEL, CS.buttons_msg))
-          self.last_button_frame = self.frame
+            self.last_button_counter = CS.buttons_counter
+            self.last_button_frame = self.frame
+        else:
+          self.last_button_counter = -1
 
     if self.CP.flags & HyundaiFlags.CANFD_DISABLE_DAW:
       # Kia/Hyundai Driver Attention Warning (coffee break / rest recommendation)
