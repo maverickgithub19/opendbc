@@ -29,6 +29,13 @@ MAX_ANGLE_CONSECUTIVE_FRAMES = 2
 # naturally on brake press. We send ~100 ms later if it fails to do so, or if we want to cancel for another reason.
 CANCEL_BUTTON_DELAY_FRAMES = 10
 
+# CAN FD factory SCC only resumes from standstill when the RES press looks like
+# a real held button: fresh counters at the normal button cadence. Some cars do
+# not publish fresh CRUISE_BUTTONS_ALT counters while stopped, so allow a short
+# locally-counted RES hold instead of depending entirely on stock button traffic.
+RESUME_BUTTON_INTERVAL_FRAMES = 2   # 50 Hz at DT_CTRL=0.01s
+RESUME_BUTTON_HOLD_FRAMES = 150     # 1.5s max per resume request
+
 
 def process_hud_alert(enabled, fingerprint, hud_control):
   sys_warning = (hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw))
@@ -73,6 +80,8 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
     self.car_fingerprint = CP.carFingerprint
     self.last_button_frame = 0
     self.last_button_counter = -1
+    self.synthetic_button_counter = -1
+    self.resume_button_start_frame = -1
     self.cancel_counter = 0
     self.daw_reset_cnt = 0
 
@@ -246,15 +255,31 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
 
         # cruise standstill resume
         elif CC.cruiseControl.resume:
-          # Match the real button better: one RES frame for each fresh stock button counter.
-          # Bursting many duplicate-counter frames at 4 Hz showed up on the bus but was ignored
-          # by Carnival HEV factory SCC; physical RES presses are continuous 50 Hz counter-advancing frames.
-          if CS.buttons_counter != self.last_button_counter:
-            can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, CS.buttons_counter + 1, Buttons.RES_ACCEL, CS.buttons_msg))
+          # Match a real held RES press. Prefer the stock button counter when it
+          # is fresh, but do not depend on it while stopped: Carnival HEV CAN FD
+          # logs show the factory 0x1aa counter can be stale exactly when
+          # openpilot requests standstill resume.
+          starting_resume = self.resume_button_start_frame < 0
+          if starting_resume:
+            self.resume_button_start_frame = self.frame
+            self.synthetic_button_counter = CS.buttons_counter
+
+          hold_active = self.frame - self.resume_button_start_frame < RESUME_BUTTON_HOLD_FRAMES
+          send_resume = hold_active and (starting_resume or
+                                         CS.buttons_counter != self.last_button_counter or
+                                         self.frame - self.last_button_frame >= RESUME_BUTTON_INTERVAL_FRAMES)
+          if send_resume:
+            if CS.buttons_counter != self.last_button_counter:
+              self.synthetic_button_counter = CS.buttons_counter
+            self.synthetic_button_counter = (self.synthetic_button_counter + 1) % 0x100
+            can_sends.append(hyundaicanfd.create_buttons(self.packer, self.CP, self.CAN, self.synthetic_button_counter,
+                                                         Buttons.RES_ACCEL, CS.buttons_msg))
             self.last_button_counter = CS.buttons_counter
             self.last_button_frame = self.frame
         else:
           self.last_button_counter = -1
+          self.synthetic_button_counter = -1
+          self.resume_button_start_frame = -1
 
     if self.CP.flags & HyundaiFlags.CANFD_DISABLE_DAW:
       # Kia/Hyundai Driver Attention Warning (coffee break / rest recommendation)
