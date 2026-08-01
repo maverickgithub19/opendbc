@@ -574,9 +574,9 @@ class CAR(Platforms):
     # force CANFD_DISABLE_DAW here; some Carnival HEV HDA II variants do not send
     # FR_CMR_01_10ms on the camera bus, and requiring it makes CAN validity fail.
     # interface.py may enable DAW suppression dynamically only when that frame exists.
-    # Do not add CANFD_NO_RADAR_DISABLE here; changing base platform flags on this
-    # branch can trip sunnypilot's vehicle variant matching.
-    flags=HyundaiFlags.HYBRID,
+    # Do not hard-code HYBRID for CAN-FD platforms. interface.py detects the
+    # Carnival HEV from its 0xFA E-CAN frame and then applies HYBRID_GAS safety
+    # and the correct accelerator parsing at runtime.
   )
 
   # Genesis
