@@ -31,10 +31,14 @@ CANCEL_BUTTON_DELAY_FRAMES = 10
 
 # CAN FD factory SCC only resumes from standstill when the RES press looks like
 # a real held button: fresh counters at the normal button cadence. Some cars do
-# not publish fresh CRUISE_BUTTONS_ALT counters while stopped, so allow a short
+# not publish fresh CRUISE_BUTTONS_ALT counters while stopped, so allow a bounded
 # locally-counted RES hold instead of depending entirely on stock button traffic.
+# Carnival route b3344051f4d069e6|00000018--9474db483f showed valid RES frames
+# stopped after 1.5 s while the resume request remained true for up to 4.9 s;
+# users then had to press RES manually. Keep the physical-button cadence but
+# cover that observed Kia SCC acknowledgement window.
 RESUME_BUTTON_INTERVAL_FRAMES = 2   # 50 Hz at DT_CTRL=0.01s
-RESUME_BUTTON_HOLD_FRAMES = 150     # 1.5s max per resume request
+RESUME_BUTTON_HOLD_FRAMES = 500     # 5.0s max: covers proven SCC acknowledgement lag
 
 
 def process_hud_alert(enabled, fingerprint, hud_control):
